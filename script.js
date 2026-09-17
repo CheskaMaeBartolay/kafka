@@ -87,50 +87,83 @@ const joinGameBtn = document.getElementById("joinGameBtn");
 const lastUpdated = document.getElementById("lastUpdated");
 
 async function loadRobloxPresence() {
+  // Always hide the join button before checking
+  joinGameBtn.style.display = "none";
+  joinGameBtn.hidden = true;
+
   try {
-    const response = await fetch(`/api/presence?userId=${ROBLOX_USER_ID}&t=${Date.now()}`, { cache: "no-store" });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const response = await fetch(
+      `/api/presence?userId=${ROBLOX_USER_ID}&t=${Date.now()}`,
+      {
+        cache: "no-store",
+        headers: {
+          Accept: "application/json"
+        }
+      }
+    );
+
     const data = await response.json();
     const presence = data.userPresences?.[0];
-    const type = Number(presence?.userPresenceType || 0);
-    const placeId = presence?.placeId || presence?.rootPlaceId;
 
-    if (type === 2) {
-      statusDot.className = "status-dot online";
-      onlineStatus.textContent = "Currently Playing";
-      currentGame.textContent = presence.lastLocation || "Playing a Roblox game";
-      if (placeId) {
-        joinGameBtn.href = `https://www.roblox.com/games/start?placeId=${placeId}`;
-        joinGameBtn.hidden = false;
-      } else {
-        joinGameBtn.hidden = true;
-        currentGame.textContent += " (join link unavailable)";
-      }
-    } else if (type === 3) {
-      statusDot.className = "status-dot studio";
-      onlineStatus.textContent = "In Roblox Studio";
-      currentGame.textContent = "Currently developing in Roblox Studio.";
-      joinGameBtn.hidden = true;
-    } else if (type === 1) {
-      statusDot.className = "status-dot online";
-      onlineStatus.textContent = "Online";
-      currentGame.textContent = "Browsing Roblox.";
-      joinGameBtn.hidden = true;
-    } else {
-      statusDot.className = "status-dot offline";
+    console.log("Roblox presence:", presence);
+
+    if (!presence) {
       onlineStatus.textContent = "Offline";
       currentGame.textContent = "Not currently playing Roblox.";
-      joinGameBtn.hidden = true;
+      statusDot.className = "status-dot offline";
+      return;
     }
-    lastUpdated.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+
+    const presenceType = Number(presence.userPresenceType);
+
+    // Only show Join Game when actually inside a Roblox game
+    if (presenceType === 2) {
+      onlineStatus.textContent = "Currently Playing";
+      currentGame.textContent =
+        presence.lastLocation || "Playing a Roblox game";
+      statusDot.className = "status-dot online";
+
+      const placeId = presence.placeId || presence.rootPlaceId;
+
+      if (placeId) {
+        joinGameBtn.href =
+          `https://www.roblox.com/games/start?placeId=${placeId}`;
+
+        joinGameBtn.textContent = "Join Current Game →";
+        joinGameBtn.style.display = "inline-flex";
+        joinGameBtn.hidden = false;
+      }
+
+      return;
+    }
+
+    if (presenceType === 3) {
+      onlineStatus.textContent = "In Roblox Studio";
+      currentGame.textContent = "Currently developing in Roblox Studio.";
+      statusDot.className = "status-dot studio";
+      return;
+    }
+
+    if (presenceType === 1) {
+      onlineStatus.textContent = "Online";
+      currentGame.textContent = "Browsing Roblox.";
+      statusDot.className = "status-dot online";
+      return;
+    }
+
+    onlineStatus.textContent = "Offline";
+    currentGame.textContent = "Not currently playing Roblox.";
+    statusDot.className = "status-dot offline";
+
   } catch (error) {
-    console.error("Presence error:", error);
+    console.error("Roblox presence error:", error);
+
     onlineStatus.textContent = "Status unavailable";
     currentGame.textContent = "Could not load Roblox activity.";
-    joinGameBtn.hidden = true;
     statusDot.className = "status-dot offline";
   }
 }
 
+// Check immediately, then every 2 seconds
 loadRobloxPresence();
 setInterval(loadRobloxPresence, 2000);
